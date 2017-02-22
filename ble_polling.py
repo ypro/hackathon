@@ -2,7 +2,7 @@ import dbus
 import sys
 from time import sleep
 
-address = sys.argv[1]
+name = sys.argv[1]
 bus = dbus.SystemBus()
 bluez = bus.get_object('org.bluez','/')
 bluez_iface = dbus.Interface(bluez, 'org.freedesktop.DBus.ObjectManager')
@@ -10,8 +10,9 @@ objects = bluez_iface.GetManagedObjects()
 
 for obj, ifaces in objects.items():
     if 'org.bluez.Device1' in ifaces.keys():
-        if 'Address' in ifaces['org.bluez.Device1']:
-            if address in ifaces['org.bluez.Device1']['Address']:
+        if 'Name' in ifaces['org.bluez.Device1']:
+            if name in ifaces['org.bluez.Device1']['Name']:
+                print "Name match with", name
                 device_path = obj
 
 print device_path
