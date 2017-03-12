@@ -6,7 +6,7 @@
         var ws;
  
         function onLoad() {
-            ws = new WebSocket("ws://192.168.1.144:8888/websocket");
+            ws = new WebSocket("ws://192.168.1.235:8888/websocket");
  
             ws.onmessage = function(e) {
                alert(e.data);
