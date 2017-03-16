@@ -9,6 +9,8 @@ import tornado.web
 
 PORT=8888
 
+my_microbits=['zotev', 'vevez']
+
 class WebSocketHandler(tornado.websocket.WebSocketHandler):
     def check_origin(self, origin):
         return True
@@ -16,16 +18,17 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
     def open(self):
         global bt
         self.bt = bt
-        self.callback = PeriodicCallback(self.check_status, 1000)
+        self.callback = PeriodicCallback(self.check_status, 10)
         self.callback.start()
         print "Opened Connection"
 
     def check_status(self):
-        (btnA, btnB) = self.bt.getBtn()
-        if btnA>0:
-            self.write_message('Button A')
-        if btnB>0:
-            self.write_message('Button B')
+        for mb in my_microbits:
+            (btnA, btnB) = self.bt.getBtn(mb)
+            if btnA>0:
+                self.write_message('Button A on '+mb)
+            if btnB>0:
+                self.write_message('Button B on '+mb)
 
     def send_echo(self, message):
         self.write_message(message)
@@ -84,6 +87,11 @@ class Bluetooth():
 
         print device_paths
 
+        self.btn_a_iface={}
+        self.btn_b_iface={}
+        self.led_iface={}
+        self.uart_iface={}
+
         for name, device_path in device_paths.iteritems():
             remote_device_obj = bus.get_object('org.bluez', device_path)
             self.remote_device_methods = dbus.Interface(remote_device_obj, 'org.bluez.Device1')
@@ -107,47 +115,47 @@ class Bluetooth():
                             uart_path = obj
 
                 
-        print btn_a_path
-        print btn_b_path
-        print led_path
-        print uart_path
+            print btn_a_path
+            print btn_b_path
+            print led_path
+            print uart_path
 
-        self.btn_a_iface = dbus.Interface(bus.get_object('org.bluez', btn_a_path), 'org.bluez.GattCharacteristic1')
-        self.btn_b_iface = dbus.Interface(bus.get_object('org.bluez', btn_b_path), 'org.bluez.GattCharacteristic1')
-        self.led_iface = dbus.Interface(bus.get_object('org.bluez', led_path), 'org.bluez.GattCharacteristic1')
-        self.uart_iface = dbus.Interface(bus.get_object('org.bluez', uart_path), 'org.bluez.GattCharacteristic1')
+            self.btn_a_iface[name] = dbus.Interface(bus.get_object('org.bluez', btn_a_path), 'org.bluez.GattCharacteristic1')
+            self.btn_b_iface[name] = dbus.Interface(bus.get_object('org.bluez', btn_b_path), 'org.bluez.GattCharacteristic1')
+            self.led_iface[name] = dbus.Interface(bus.get_object('org.bluez', led_path), 'org.bluez.GattCharacteristic1')
+            self.uart_iface[name] = dbus.Interface(bus.get_object('org.bluez', uart_path), 'org.bluez.GattCharacteristic1')
 
         print self.btn_a_iface
 
-    def getBtn(self):
-        btn_val = self.btn_a_iface.ReadValue(dbus.Array())
+    def getBtn(self, name):
+        btn_val = self.btn_a_iface[name].ReadValue(dbus.Array())
         btn_a = int(btn_val[0])
-        btn_val = self.btn_b_iface.ReadValue(dbus.Array())
+        btn_val = self.btn_b_iface[name].ReadValue(dbus.Array())
         btn_b = int(btn_val[0])
 
         return (btn_a, btn_b)
 
-    def putLed(self, msg):
-        self.led_iface.WriteValue([ord(msg[0])], ())
+    def putLed(self, name, msg):
+        self.led_iface[name].WriteValue([ord(msg[0])], ())
         print "Sent", msg
 
-    def printStatus(self):
-        btn_val = self.btn_a_iface.ReadValue(dbus.Array())
+    def printStatus(self, name):
+        btn_val = self.btn_a_iface[name].ReadValue(dbus.Array())
         btn_a = int(btn_val[0])
-        btn_val = self.btn_b_iface.ReadValue(dbus.Array())
+        btn_val = self.btn_b_iface[name].ReadValue(dbus.Array())
         btn_b = int(btn_val[0])
         if btn_a > 0 and btn_b < 1:
-            self.led_iface.WriteValue([ord('A')], ())
+            self.led_iface[name].WriteValue([ord('A')], ())
             print('Button A')        
         elif btn_a < 1 and btn_b > 0:
             print('Button B')
-            self.led_iface.WriteValue([ord('B')], ())
+            self.led_iface[name].WriteValue([ord('B')], ())
         elif btn_a > 0 and btn_b > 0:
             message = 'Quit.'
             val = []
             for c in message:
                 val.append(ord(c))
-            self.uart_iface.WriteValue(val, ())
+            self.uart_iface[name].WriteValue(val, ())
             sense_buttons = False
             print('Bye bye!!!')
         if not self.remote_device_props.Get('org.bluez.Device1', 'Connected'):  
@@ -157,9 +165,8 @@ class Bluetooth():
         self.remote_device_methods.Disconnect()
 
 def main():
-    names = ['zotev']
     global bt
-    bt = Bluetooth(names)
+    bt = Bluetooth(my_microbits)
     ws_app = Application()
     server = tornado.httpserver.HTTPServer(ws_app)
     server.listen(PORT)
