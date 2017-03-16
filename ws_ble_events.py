@@ -1,3 +1,4 @@
+import threading
 import dbus
 import sys, re
 from time import sleep
@@ -6,6 +7,7 @@ import tornado.websocket
 import tornado.ioloop
 import tornado.web
 from gi.repository import GObject
+from dbus.mainloop.glib import DBusGMainLoop
 
 PORT=8888
 
@@ -60,11 +62,12 @@ class Bluetooth():
         self.setup(names)
 
     def setup(self, names):
-        def on_btn_a(name, a, b, c):
+        def on_btn_a2(name, a, b, c):
             global handler
             if handler!=None:
                 handler.on_btn_a(name, a, b, c)
             
+        DBusGMainLoop(set_as_default=True)
         bus = dbus.SystemBus()
         bluez = bus.get_object('org.bluez','/')
         bluez_iface = dbus.Interface(bluez, 'org.freedesktop.DBus.ObjectManager')
@@ -118,7 +121,7 @@ class Bluetooth():
             btn_a_obj=bus.get_object('org.bluez', btn_a_path)
             btn_a_iface = dbus.Interface(bus.get_object('org.bluez', btn_a_path), 'org.bluez.GattCharacteristic1')
             btn_a_prop = dbus.Interface(bus.get_object('org.bluez', btn_a_path), dbus.PROPERTIES_IFACE)
-            btn_a_prop.connect_to_signal('PropertiesChanged', lambda: on_btn_a(name))
+            btn_a_prop.connect_to_signal('PropertiesChanged', lambda a, b, c: on_btn_a2(name, a, b, c))
             btn_a_obj.StartNotify(dbus_interface='org.bluez.GattCharacteristic1')
 
             #self.btn_a_iface = dbus.Interface(bus.get_object('org.bluez', btn_a_path), 'org.bluez.GattCharacteristic1')
@@ -165,11 +168,14 @@ def main():
     global handler
     handler = None
     ws_app = Application()
-    bt = Bluetooth(names)
     server = tornado.httpserver.HTTPServer(ws_app)
     server.listen(PORT)
     print "Starting"
-    tornado.ioloop.IOLoop.instance().start()
+    t1 = threading.Thread(target=tornado.ioloop.IOLoop.instance().start())
+    t1.start()
+    print "Started"
+
+#    bt = Bluetoooh(names)
 
 if __name__=='__main__':
    main()
