@@ -17,4 +17,6 @@ sudo systemctl restart bluetooth
 sudo apt-get install python-dev libdbus-1-dev libdbus-glib-1-dev
 sudo apt-get install python-pip
 sudo apt-get install --reinstall python-gi
+
 sudo python2.7 -m pip install dbus-python
+sudo python2.7 -m pip install tornado
