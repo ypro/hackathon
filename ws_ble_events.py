@@ -18,6 +18,8 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
     def open(self):
         global handler
         handler = self
+        global bt
+        self.bt = bt
         print "Opened Connection"
 
     def on_btn_a(self, name, char, changed, dummy):
@@ -66,7 +68,7 @@ class Bluetooth():
             global handler
             if handler!=None:
                 handler.on_btn_a(name, a, b, c)
-            
+
         DBusGMainLoop(set_as_default=True)
         bus = dbus.SystemBus()
         bluez = bus.get_object('org.bluez','/')
@@ -112,7 +114,6 @@ class Bluetooth():
                         if ifaces['org.bluez.GattCharacteristic1']['UUID'] == '6e400003-b5a3-f393-e0a9-e50e24dcca9e':
                             uart_path = obj
 
-                
             print btn_a_path
             print btn_b_path
             print led_path
@@ -124,15 +125,16 @@ class Bluetooth():
             btn_a_prop.connect_to_signal('PropertiesChanged', lambda a, b, c: on_btn_a2(name, a, b, c))
             btn_a_obj.StartNotify(dbus_interface='org.bluez.GattCharacteristic1')
 
-            #self.btn_a_iface = dbus.Interface(bus.get_object('org.bluez', btn_a_path), 'org.bluez.GattCharacteristic1')
-            #self.btn_b_iface = dbus.Interface(bus.get_object('org.bluez', btn_b_path), 'org.bluez.GattCharacteristic1')
-            #self.led_iface = dbus.Interface(bus.get_object('org.bluez', led_path), 'org.bluez.GattCharacteristic1')
-            #self.uart_iface = dbus.Interface(bus.get_object('org.bluez', uart_path), 'org.bluez.GattCharacteristic1')
+            self.btn_b_iface = dbus.Interface(bus.get_object('org.bluez', btn_b_path), 'org.bluez.GattCharacteristic1')
+            self.led_iface = dbus.Interface(bus.get_object('org.bluez', led_path), 'org.bluez.GattCharacteristic1')
+            self.uart_iface = dbus.Interface(bus.get_object('org.bluez', uart_path), 'org.bluez.GattCharacteristic1')
 
-            #print self.btn_a_iface
+            print self.btn_a_iface
 
-        loop = GObject.MainLoop()
-        loop.run()
+        GObject.threads_init()
+        myT = threading.Thread(target=GObject.MainLoop().run)
+        myT.start()
+        print "Started bt"
 
     def putLed(self, msg):
         self.led_iface.WriteValue([ord(msg[0])], ())
@@ -165,17 +167,18 @@ class Bluetooth():
 
 def main():
     names = ['zotev']
+
     global handler
     handler = None
+
+    global bt
+    bt = Bluetooth(names)
+
     ws_app = Application()
     server = tornado.httpserver.HTTPServer(ws_app)
     server.listen(PORT)
     print "Starting"
-    t1 = threading.Thread(target=tornado.ioloop.IOLoop.instance().start())
-    t1.start()
-    print "Started"
-
-#    bt = Bluetoooh(names)
+    tornado.ioloop.IOLoop.instance().start()
 
 if __name__=='__main__':
    main()
